@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Executive Dashboard</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+</head>
+
+<body class="bg-slate-900 text-white p-6">
+
+<h1 class="text-2xl font-bold mb-6">📊 Executive Dashboard</h1>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-slate-800 p-4 rounded">👥 ผู้สมัคร<br><span id="total"></span></div>
+  <div class="bg-slate-800 p-4 rounded">🎓 GPA เฉลี่ย<br><span id="gpa"></span></div>
+  <div class="bg-slate-800 p-4 rounded">🏫 โรงเรียน<br><span id="schools"></span></div>
+  <div class="bg-slate-800 p-4 rounded">📍 จังหวัด<br><span id="province"></span></div>
+</div>
+
+<div class="bg-slate-800 p-4 rounded mb-6">
+  <h2 class="mb-2">Top จังหวัด</h2>
+  <ul id="topProvince"></ul>
+</div>
+
+<div class="bg-slate-800 p-4 rounded mb-6">
+  <h2 class="mb-2">Top โรงเรียน</h2>
+  <ul id="topSchool"></ul>
+</div>
+
+<div class="bg-slate-800 p-4 rounded">
+  <h2 class="mb-2">Top Rank</h2>
+  <table class="w-full text-sm">
+    <thead>
+      <tr><th>Rank</th><th>ชื่อ</th></tr>
+    </thead>
+    <tbody id="topRank"></tbody>
+  </table>
+</div>
+
+<script>
+let data = [];
+
+Papa.parse('find_cadet69.csv', {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: function(res) {
+    data = res.data.filter(r => r.exam_id);
+
+    render();
+  }
+});
+
+function render() {
+  document.getElementById('total').innerText = data.length;
+
+  const gpaAvg = (
+    data.reduce((sum, r) => sum + (parseFloat(r.gpa)||0), 0) / data.length
+  ).toFixed(2);
+
+  document.getElementById('gpa').innerText = gpaAvg;
+
+  document.getElementById('schools').innerText =
+    new Set(data.map(r => r.school_name)).size;
+
+  document.getElementById('province').innerText =
+    new Set(data.map(r => r.province)).size;
+
+  renderTop('province', 'topProvince');
+  renderTop('school_name', 'topSchool');
+
+  const topRank = data
+    .sort((a,b)=>a.exam_rank - b.exam_rank)
+    .slice(0,10);
+
+  document.getElementById('topRank').innerHTML =
+    topRank.map(r=>`
+      <tr>
+        <td>${r.exam_rank}</td>
+        <td>${r.first_name} ${r.last_name}</td>
+      </tr>
+    `).join('');
+}
+
+function renderTop(field, el) {
+  const count = {};
+
+  data.forEach(r=>{
+    const key = r[field] || '-';
+    count[key] = (count[key]||0)+1;
+  });
+
+  const sorted = Object.entries(count)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,5);
+
+  document.getElementById(el).innerHTML =
+    sorted.map(i=>`<li>${i[0]} (${i[1]})</li>`).join('');
+}
+</script>
+
+</body>
+</html>
