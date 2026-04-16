@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบค้นหาข้อมูลผู้สมัคร นตท.ทร. ๒๕๖๙</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    /* Custom styles for animations and specific components */
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+    }
+
+    .glow-rank {
+      box-shadow: 0 0 15px rgba(250, 204, 21, 0.5);
+      animation: pulse-glow 2s infinite;
+    }
+
+    @keyframes pulse-glow {
+      0% {
+        box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+      }
+
+      50% {
+        box-shadow: 0 0 20px rgba(250, 204, 21, 0.8);
+      }
+
+      100% {
+        box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+      }
+    }
+
+    .hide-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hide-scroll {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-900 text-slate-200 min-h-screen">
+
+  <header class="bg-slate-800 border-b border-slate-700 shadow-md sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-center gap-3">
+      <span class="text-3xl">⚓</span>
+      <h1 class="text-xl md:text-2xl font-bold text-white tracking-wide">
+        ระบบค้นหาข้อมูลผู้สมัคร นตท.ทร. ๒๕๖๙
+      </h1>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-8">
+
+    <section id="uploadSection" class="mb-8">
+      <div
+        class="max-w-xl mx-auto bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-sky-500 transition-colors duration-300">
+        <div class="text-5xl mb-4">📂</div>
+        <h2 class="text-xl font-semibold text-white mb-2">อัปโหลดไฟล์ข้อมูลผู้สมัคร</h2>
+        <p class="text-slate-400 text-sm mb-6">กรุณาเลือกไฟล์ .csv เพื่อเริ่มต้นใช้งานระบบ</p>
+
+        <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+        <label for="csvFileInput"
+          class="cursor-pointer inline-flex items-center justify-center px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-lg shadow-lg transition-colors">
+          เลือกไฟล์ CSV
+        </label>
+      </div>
+    </section>
+
+    <section id="searchSection" class="hidden flex-col items-center mb-8">
+      <div class="w-full max-w-2xl relative">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input type="text" id="searchInput"
+          class="w-full pl-12 pr-4 py-4 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-lg text-lg transition-all"
+          placeholder="ค้นหาด้วยชื่อ-นามสกุล หรือ เลขประจำตัวสอบ...">
+      </div>
+      <p class="text-slate-400 text-sm mt-3 flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        ระบบพร้อมใช้งาน (พบข้อมูล <span id="dataCount" class="font-bold text-white">0</span> รายการ)
+      </p>
+      <p class="text-slate-500 text-xs mt-1">ค้นหาจาก: เลขประจำตัวสอบ · ชื่อ-นามสกุล</p>
+    </section>
+
+    <div id="resultsArea" class="max-w-4xl mx-auto space-y-6">
+    </div>
+
+  </main>
+
+  <script>
+    // Global variables
+    let cadetsData = [];
+
+    // Elements
+    const uploadSection = document.getElementById('uploadSection');
+    const searchSection = document.getElementById('searchSection');
+    const csvFileInput = document.getElementById('csvFileInput');
+    const searchInput = document.getElementById('searchInput');
+    const resultsArea = document.getElementById('resultsArea');
+    const dataCount = document.getElementById('dataCount');
+
+    // --- 1. Handle File Upload ---
+    csvFileInput.addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+          // กรองเอาเฉพาะแถวที่มีข้อมูล exam_id จริงๆ เท่านั้น (ตัดแถวว่างของ Excel ทิ้ง)
+          cadetsData = results.data.filter(row => row.exam_id && row.exam_id.toString().trim() !== '');
+
+          // Update UI
+          dataCount.textContent = cadetsData.length.toLocaleString();
+          uploadSection.classList.add('hidden');
+          searchSection.classList.remove('hidden');
+          searchSection.classList.add('flex');
+
+          // Focus search box
+          setTimeout(() => searchInput.focus(), 100);
+        },
+        error: function (err) {
+          alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+        }
+      });
+    });
+
+    // --- 2. Handle Search ---
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+
+      if (query.length === 0) {
+        resultsArea.innerHTML = '';
+        return;
+      }
+
+      const results = searchCadets(query);
+      renderResults(results, query);
+    });
+
+    function searchCadets(query) {
+      const q = query.toLowerCase().replace(/\s+/g, ''); // ลบช่องว่างออกเวลาค้นหา
+
+      return cadetsData.filter(c => {
+        // จัด Format Exam ID เป็น 4 หลักเพื่อให้ค้นหาด้วย "0007" เจอ
+        const examId = String(c.exam_id || '').padStart(4, '0').toLowerCase();
+        const firstName = (c.first_name || '').toLowerCase();
+        const lastName = (c.last_name || '').toLowerCase();
+        const fullName = firstName + lastName;
+        const fullNameSpaced = firstName + ' ' + lastName;
+
+        // ค้นหาจากเลขสอบ และ ชื่อ-นามสกุล เท่านั้น
+        return examId.includes(q) || fullName.includes(q) || fullNameSpaced.includes(query.toLowerCase());
+      });
+    }
+
+    // --- 3. Render Logic ---
+    function renderResults(results, query) {
+      if (results.length === 0) {
+        resultsArea.innerHTML = `
+                    <div class="text-center py-12 bg-slate-800 rounded-xl border border-slate-700">
+                        <div class="text-4xl mb-3">🔍</div>
+                        <h3 class="text-lg font-medium text-white mb-1">ไม่พบข้อมูล</h3>
+                        <p class="text-slate-400 text-sm">ไม่พบผลลัพธ์สำหรับ "${query}"<br>โปรดตรวจสอบตัวสะกด หรือ เลขประจำตัวสอบอีกครั้ง</p>
+                    </div>
+                `;
+        return;
+      }
+
+      // ถ้าเจอคนเดียว แสดง Card เลย
+      if (results.length === 1) {
+        resultsArea.innerHTML = createCardHTML(results[0]);
+        return;
+      }
+
+      // ถ้าเจอหลายคน (แสดงเป็นตาราง สูงสุด 50 คน)
+      const MAX_SHOW = 50;
+      const toShow = results.slice(0, MAX_SHOW);
+
+      let html = `
+                <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg">
+                    <div class="px-6 py-4 bg-slate-750 border-b border-slate-700 flex justify-between items-center">
+                        <h3 class="font-medium text-white">พบ ${results.length} รายการ <span class="text-slate-400 text-sm font-normal">(คลิกเพื่อดูรายละเอียด)</span></h3>
+                        ${results.length > MAX_SHOW ? `<span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">แสดง ${MAX_SHOW} รายการแรก</span>` : ''}
+                    </div>
+                    <div class="overflow-x-auto hide-scroll">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-800/50 text-slate-400 text-sm uppercase tracking-wider">
+                                    <th class="px-6 py-3 border-b border-slate-700 font-medium">เลขสอบ</th>
+                                    <th class="px-6 py-3 border-b border-slate-700 font-medium">ชื่อ - นามสกุล</th>
+                                    <th class="px-6 py-3 border-b border-slate-700 font-medium">โรงเรียน</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700">
+                                ${toShow.map(c => `
+                                    <tr class="hover:bg-slate-700/50 cursor-pointer transition-colors" onclick="showSingleCard('${c.exam_id}')">
+                                        <td class="px-6 py-4 whitespace-nowrap font-medium text-sky-400">${String(c.exam_id || '').padStart(4, '0') || '-'}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-white">${c.first_name || ''} ${c.last_name || ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-slate-400 text-sm">${c.school_name || c.schoolschool_name || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+      resultsArea.innerHTML = html;
+    }
+
+    // --- 4. Render Card Component ---
+    window.showSingleCard = function (examId) {
+      const cadet = cadetsData.find(c => c.exam_id === examId);
+      if (cadet) {
+        resultsArea.innerHTML = createCardHTML(cadet);
+        // Scroll to top of results
+        document.getElementById('searchSection').scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+
+    function formatID(id) {
+      if (!id || id.length !== 13) return id || '-';
+      return `${id[0]}-${id.substring(1, 5)}-${id.substring(5, 10)}-${id.substring(10, 12)}-${id[12]}`;
+    }
+
+    function getGPAColor(gpa) {
+      const val = parseFloat(gpa);
+      if (isNaN(val)) return 'text-slate-300';
+      if (val >= 3.5) return 'text-emerald-400 font-bold';
+      if (val >= 3.0) return 'text-sky-400 font-medium';
+      if (val >= 2.0) return 'text-yellow-400';
+      return 'text-red-400';
+    }
+
+    function createCardHTML(data) {
+      const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+      const school = data.school_name || data.schoolschool_name || '-';
+
+      return `
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl overflow-hidden animate-fade-in relative">
+                    
+                    <div class="bg-gradient-to-br from-slate-800 to-slate-900 px-8 py-8 border-b border-slate-700 relative">
+                        <div class="absolute top-6 right-6">
+                            <div class="bg-yellow-500/10 border border-yellow-400/50 glow-rank px-4 py-2 rounded-lg flex flex-col items-center">
+                                <span class="text-yellow-500/80 text-xs font-bold uppercase tracking-widest mb-0.5">ลำดับที่สอบได้</span>
+                                <span class="text-yellow-400 text-3xl font-extrabold leading-none">${data.exam_rank || '-'}</span>
+                            </div>
+                        </div>
+
+                        <div class="pr-32">
+                            <p class="text-slate-400 text-sm font-medium mb-1">เลขประจำตัวสอบ</p>
+                            <h2 class="text-5xl font-black text-sky-400 mb-4 tracking-tight">${String(data.exam_id || '').padStart(4, '0') || '-'}</h2>
+                            <h3 class="text-2xl font-bold text-white mb-2">${fullName}</h3>
+                            <div class="inline-flex items-center px-3 py-1 bg-slate-900/50 rounded-md border border-slate-700/50">
+                                <span class="text-slate-500 text-xs mr-2">เลข ปชช:</span>
+                                <span class="text-slate-400 text-sm font-mono tracking-wider">${formatID(data.national_id)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <h4 class="text-sky-500 font-semibold flex items-center border-b border-slate-700 pb-2">
+                                <span class="mr-2">👤</span> ข้อมูลส่วนตัว
+                            </h4>
+                            <div class="grid grid-cols-3 gap-y-3 text-sm">
+                                <div class="text-slate-400">วันเกิด:</div>
+                                <div class="col-span-2 text-white font-medium">${data.birth_date || '-'}</div>
+                                
+                                <div class="text-slate-400">ตำบล:</div>
+                                <div class="col-span-2 text-white">${data.sub_district || '-'}</div>
+                                
+                                <div class="text-slate-400">อำเภอ:</div>
+                                <div class="col-span-2 text-white">${data.district || '-'}</div>
+                                
+                                <div class="text-slate-400">จังหวัด:</div>
+                                <div class="col-span-2 text-white">${data.province || '-'}</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="text-sky-500 font-semibold flex items-center border-b border-slate-700 pb-2">
+                                <span class="mr-2">🎓</span> ข้อมูลการศึกษา
+                            </h4>
+                            <div class="grid grid-cols-3 gap-y-3 text-sm">
+                                <div class="text-slate-400">ระดับชั้น:</div>
+                                <div class="col-span-2 text-white">${data.grade_level || '-'}</div>
+                                
+                                <div class="text-slate-400">GPA:</div>
+                                <div class="col-span-2 ${getGPAColor(data.gpa)} text-lg leading-none">${data.gpa || '-'}</div>
+                                
+                                <div class="text-slate-400">โรงเรียน:</div>
+                                <div class="col-span-2 text-white">${school}</div>
+                                
+                                <div class="text-slate-400">จ.โรงเรียน:</div>
+                                <div class="col-span-2 text-white">${data.school_province || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="px-8 pb-6">
+                        <h4 class="text-emerald-500 font-semibold flex items-center border-b border-slate-700 pb-2 mb-4">
+                            <span class="mr-2">🎯</span> ลำดับเหล่าที่เลือก
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-3 text-center">
+                                <div class="text-emerald-500/80 text-xs mb-1">อันดับที่ 1</div>
+                                <div class="text-white font-semibold text-sm">${data.choice_1 || '-'}</div>
+                            </div>
+                            <div class="bg-slate-700/30 border border-slate-600 rounded-lg p-3 text-center">
+                                <div class="text-slate-400 text-xs mb-1">อันดับที่ 2</div>
+                                <div class="text-slate-200 text-sm">${data.choice_2 || '-'}</div>
+                            </div>
+                            <div class="bg-slate-700/30 border border-slate-600 rounded-lg p-3 text-center">
+                                <div class="text-slate-400 text-xs mb-1">อันดับที่ 3</div>
+                                <div class="text-slate-300 text-sm">${data.choice_3 || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 px-8 py-5 border-t border-slate-700">
+                        <h4 class="text-slate-400 font-semibold text-sm mb-3">📞 ข้อมูลการติดต่อ</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                            <div class="flex items-center gap-3 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs">🧒</div>
+                                <div>
+                                    <div class="text-slate-400 text-xs">เบอร์ผู้สมัคร</div>
+                                    <div class="text-white font-mono">${formatPhone(data.phone_student)}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs">👨</div>
+                                <div>
+                                    <div class="text-slate-400 text-xs">เบอร์บิดา</div>
+                                    <div class="text-white font-mono">${formatPhone(data.phone_father)}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs">👩</div>
+                                <div>
+                                    <div class="text-slate-400 text-xs">เบอร์มารดา</div>
+                                    <div class="text-white font-mono">${formatPhone(data.phone_mother)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+    }
+
+    function formatPhone(phone) {
+      if (!phone || phone.trim() === '') return '-';
+      const p = phone.replace(/\D/g, ''); // เอาเฉพาะตัวเลข
+      if (p.length === 10) return `${p.substring(0, 3)}-${p.substring(3, 6)}-${p.substring(6)}`;
+      if (p.length === 9) return `${p.substring(0, 2)}-${p.substring(2, 5)}-${p.substring(5)}`;
+      return phone; // คืนค่าเดิมถ้าไม่ใช่ 9 หรือ 10 หลัก
+    }
+  </script>
+</body>
+
+</html>
